@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire Solver: Omega v7 (Best Move Optimizer)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Crimson+Pro:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .card-font { font-family: 'Crimson Pro', serif; }
+        .felt-bg {
+            background-color: #14532d;
+            background-image: radial-gradient(circle at 50% 50%, #166534 0%, #14532d 100%);
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.6);
+        }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        .chart-bar { transition: height 0.5s ease-out; }
+        .chart-bar:hover { filter: brightness(1.3); }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        // --- ICONS ---
+        const Icon = ({ path, size=20, className="" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d={path} />
+            </svg>
+        );
+        const Icons = {
+            Play: "M5 3l14 9-14 9V3z",
+            Zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+            Chart: "M12 20V10M18 20V4M6 20v-4",
+            Upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
+            Check: "M20 6L9 17l-5-5",
+            Info: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-1.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zm-1-5h2v2h-2zm0-8h2v6h-2z",
+            Smile: "M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm0-1.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zm-5-9.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm7 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0zm-3.5 6.5a4.5 4.5 0 0 1-4.243-3h8.486A4.5 4.5 0 0 1 10.5 17.5z",
+            Brain: "M9.5 2A2.5 2.5 0 0 1 12 4.5v1.883a3.502 3.502 0 0 1 2.291 2.292L14.5 8.5l.709-.175A3.5 3.5 0 0 1 19.5 11.5v2a3.5 3.5 0 0 1-3.5 3.5h-1.75l-.25.433A3.5 3.5 0 0 1 11 20.5h-1a3.5 3.5 0 0 1-3.5-3.5v-2a3.5 3.5 0 0 1 3.5-3.5l.709.175.209-.175A3.502 3.502 0 0 1 9.5 6.383V4.5A2.5 2.5 0 0 1 9.5 2z",
+            Refresh: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
+            Settings: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.18-.08a2 2 0 0 0-2 2v.44a2 2 0 0 0 2 2h.18a2 2 0 0 1 1.73 1l.25.43a2 2 0 0 1 0 2l-.08.18a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.18.08a2 2 0 0 0 2-2v-.44a2 2 0 0 0-2-2h-.18a2 2 0 0 1-1.73-1l-.25-.43a2 2 0 0 1 0-2l.08-.18a2 2 0 0 0-2-2z"
+        };
+
+        const SUITS = { H: { s: '♥', c: 'text-red-500' }, D: { s: '♦', c: 'text-red-500' }, C: { s: '♣', c: 'text-slate-900' }, S: { s: '♠', c: 'text-slate-900' } };
+        const VALUES = { A:1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, 'X':10, 'J':11, 'Q':12, 'K':13 };
+        
+        // --- STRATEGIES ---
+        const STRATEGIES = {
+            UNBLOCKER: { name: "The Unblocker", description: "Focuses on mobility", weights: { foundation: 50, reveal: 400, tableau: 400, stock: 20, recycle: -200, waste: 50, kingToEmpty: 800, chain: 800, demand: 800, deep: 100 }, safety: "Normal" },
+            APEX: { name: "Apex (Balanced)", weights: { foundation: 120, reveal: 700, tableau: 50, stock: 10, recycle: -600, waste: 20, kingToEmpty: 400, chain: 300, demand: 300, deep: 450 }, safety: "Smart" },
+            ROYAL_GUARD: { name: "Royal Guard", weights: { foundation: 80, reveal: 800, tableau: 50, stock: 5, recycle: -300, waste: 20, kingToEmpty: 3000, chain: 200, demand: 500, deep: 1000 }, safety: "Strict" },
+            RUSHER: { name: "Rusher (Aggro)", weights: { foundation: 800, reveal: 200, tableau: 10, stock: 5, recycle: -200, waste: 50, kingToEmpty: 50, chain: 50, demand: 50, deep: 100 }, safety: "None" },
+            DIGGER: { name: "Excavator", weights: { foundation: 20, reveal: 1500, tableau: 20, stock: 10, recycle: -100, waste: 10, kingToEmpty: 100, chain: 50, demand: 50, deep: 3000 }, safety: "None" },
+            ARCHITECT: { name: "Architect", weights: { foundation: 0, reveal: 400, tableau: 500, stock: 10, recycle: -100, waste: 50, kingToEmpty: 300, chain: 1000, demand: 400, deep: 200 }, safety: "Strict" },
+            TACTICIAN: { name: "The Tactician", weights: { foundation: 50, reveal: 500, tableau: 50, stock: 10, recycle: -200, waste: 20, kingToEmpty: 200, chain: 2500, demand: 2500, deep: 200 }, safety: "Normal" },
+            PERFECTIONIST: { name: "Perfectionist", weights: { foundation: 50, reveal: 600, tableau: 100, stock: 0, recycle: -500, waste: 0, kingToEmpty: 100, sequenceBreak: -2000, chain: 200, demand: 200, deep: 200 }, safety: "Strict" },
+            SLAYER: { name: "King Slayer", weights: { foundation: 50, reveal: 500, tableau: 50, stock: 20, recycle: -300, waste: 30, kingToEmpty: 2000, chain: 200, demand: 200, deep: 300 }, safety: "Normal" },
+            HOARDER: { name: "Hoarder", weights: { foundation: -100, reveal: 600, tableau: 300, stock: 5, recycle: -100, waste: 40, kingToEmpty: 300, chain: 500, demand: 300, deep: 200 }, safety: "Strict" },
+            DESPERADO: { name: "Desperado", weights: { foundation: 200, reveal: 200, tableau: 200, stock: 500, recycle: 0, waste: 200, kingToEmpty: 200, chain: 0, demand: 0, deep: 0 }, safety: "None" },
+            WIDE: { name: "Wide Receiver", weights: { foundation: 50, reveal: 300, tableau: 50, stock: 20, recycle: -200, waste: 30, kingToEmpty: 200, chain: 200, demand: 200, deep: 100 }, safety: "Normal" },
+            CHAOS: { name: "Chaos Theory", weights: { foundation: 300, reveal: 300, tableau: 300, stock: 300, recycle: -100, waste: 300, kingToEmpty: 300, chain: 300, demand: 300, deep: 300 }, safety: "None" },
+            REVERSE: { name: "Reverse Logic", weights: { foundation: 500, reveal: 100, tableau: 100, stock: 100, recycle: -50, waste: 100, kingToEmpty: 50, chain: 50, demand: 50, deep: 50 }, safety: "None" }
+        };
+        const ORDERED_STRATS = ['UNBLOCKER', ...Object.keys(STRATEGIES).filter(k => k !== 'UNBLOCKER')];
+
+        // --- GAME ENGINE ---
+        const parseCard = (code) => {
+            if (!code || code.length < 2) return null;
+            const r = code.slice(0, -1), s = code.slice(-1);
+            const val = r === '10' ? 10 : (VALUES[r] || VALUES[r.toUpperCase()]);
+            return { id: code, rank: r, value: val, suit: s, faceUp: false, color: (s==='H'||s==='D')?'red':'black' };
+        };
+
+        const createGame = (deckStr, drawCount=1) => {
+            const cards = deckStr.split(',').map(s => s.trim()).filter(s=>s).map(parseCard);
+            const tableau = Array(7).fill().map(()=>[]);
+            let stock = [], idx = 0;
+            for(let i=0; i<7; i++) {
+                for(let j=0; j<=i; j++) {
+                    const c = {...cards[idx++]};
+                    if(j===i) c.faceUp = true;
+                    tableau[i].push(c);
+                }
+            }
+            stock = cards.slice(idx).map(c => ({...c, faceUp:false}));
+            return { tableau, stock, waste: [], foundations: {H:[],D:[],C:[],S:[]}, drawCount, status: 'playing', moves: 0, history: new Set(), recycleCount: 0, movesSinceProgress: 0, foundationPulls: 0 };
+        };
+
+        const getHash = (s) => {
+            const t = s.tableau.map(c => c.length + (c.length>0?c[c.length-1].id:'')).join('|');
+            const f = Object.values(s.foundations).map(x => x.length).join('|');
+            const w = s.waste.length > 0 ? s.waste[s.waste.length-1].id : 'x';
+            return `${t}#${f}#${s.stock.length}#${w}`;
+        };
+
+        const isSafe = (card, foundations, tableau, strat) => {
+            if(strat.safety === "None") return true;
+            if(card.value <= 2) return true;
+            const opp = card.color === 'red' ? ['C','S'] : ['H','D'];
+            const minOpp = Math.min(...opp.map(s => foundations[s].length));
+            const gap = strat.safety === "Strict" ? 2 : 4;
+            if(minOpp < card.value - gap) return false;
+            if(strat.safety === "Smart") {
+                const targetRank = card.value - 1;
+                const hasPartner = tableau.some(col => col.some(c => c.value === targetRank && c.color !== card.color));
+                if(hasPartner && minOpp < card.value - 2) return false;
+            }
+            return true;
+        };
+
+        const getMoves = (state) => {
+            const moves = [];
+            const { tableau, foundations, stock, waste } = state;
+            if(waste.length > 0) {
+                const c = waste[waste.length-1];
+                const fRank = foundations[c.suit].length;
+                if(c.value === fRank + 1) moves.push({ type: 'W2F', card: c });
+                for(let i=0; i<7; i++) {
+                    if(tableau[i].length===0) {
+                        if(c.value===13) moves.push({ type: 'W2T', to: i, card: c, isKing: true });
+                    } else {
+                        const t = tableau[i][tableau[i].length-1];
+                        if(c.color !== t.color && c.value === t.value - 1) moves.push({ type: 'W2T', to: i, card: c });
+                    }
+                }
+            }
+            tableau.forEach((col, i) => {
+                if(col.length === 0) return;
+                const top = col[col.length-1];
+                const fRank = foundations[top.suit].length;
+                if(top.value === fRank + 1) {
+                    const reveals = col.length > 1 && !col[col.length-2].faceUp;
+                    moves.push({ type: 'T2F', from: i, card: top, reveals });
+                }
+                let validIdx = -1;
+                for(let k=0; k<col.length; k++) if(col[k].faceUp) { validIdx=k; break; }
+                if(validIdx !== -1) {
+                    for(let j=validIdx; j<col.length; j++) {
+                        const c = col[j];
+                        if(c.value === 13 && validIdx === 0) continue;
+                        for(let d=0; d<7; d++) {
+                            if(i===d) continue;
+                            const dest = tableau[d];
+                            if(dest.length === 0) {
+                                if(c.value === 13) moves.push({ type: 'T2T', from: i, to: d, idx: j, card: c, isKing: true, reveals: (j>0 && !col[j-1].faceUp) });
+                            } else {
+                                const target = dest[dest.length-1];
+                                if(c.color !== target.color && c.value === target.value - 1) {
+                                    moves.push({ type: 'T2T', from: i, to: d, idx: j, card: c, reveals: (j>0 && !col[j-1].faceUp) });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            if(stock.length > 0) moves.push({ type: 'DRAW' });
+            else if(waste.length > 0) moves.push({ type: 'RECYCLE' });
+            Object.keys(foundations).forEach(suit => {
+                const pile = foundations[suit];
+                if (pile.length > 0) {
+                    const c = pile[pile.length - 1];
+                    if (c.value > 2) {
+                        for (let dst = 0; dst < 7; dst++) {
+                            const destPile = tableau[dst];
+                            if (destPile.length > 0) {
+                                const target = destPile[destPile.length - 1];
+                                if (c.color !== target.color && c.value === target.value - 1) {
+                                    moves.push({ type: 'F2T', suit, to: dst, card: c });
+                                }
+                            } else if (c.value === 13) {
+                                moves.push({ type: 'F2T', suit, to: dst, card: c });
+                            }
+                        }
+                    }
+                }
+            });
+            return moves;
+        };
+
+        const apply = (prev, move) => {
+            const next = { ...prev };
+            next.tableau = prev.tableau.map(c => [...c]);
+            next.foundations = { H:[...prev.foundations.H], D:[...prev.foundations.D], C:[...prev.foundations.C], S:[...prev.foundations.S] };
+            next.stock = [...prev.stock];
+            next.waste = [...prev.waste];
+            next.history = new Set(prev.history);
+            let progress = false;
+            switch(move.type) {
+                case 'W2F': next.foundations[move.card.suit].push(next.waste.pop()); progress=true; break;
+                case 'T2F': next.foundations[move.card.suit].push(next.tableau[move.from].pop()); if(next.tableau[move.from].length > 0 && !next.tableau[move.from][next.tableau[move.from].length-1].faceUp) { next.tableau[move.from][next.tableau[move.from].length-1].faceUp=true; progress=true; } progress=true; break;
+                case 'W2T': next.tableau[move.to].push(next.waste.pop()); progress=true; break;
+                case 'T2T': const chunk = next.tableau[move.from].splice(move.idx); next.tableau[move.to].push(...chunk); if(next.tableau[move.from].length > 0 && !next.tableau[move.from][next.tableau[move.from].length-1].faceUp) { next.tableau[move.from][next.tableau[move.from].length-1].faceUp=true; progress=true; } break;
+                case 'F2T': next.tableau[move.to].push(next.foundations[move.suit].pop()); next.foundationPulls++; break;
+                case 'DRAW': const n = Math.min(next.stock.length, next.drawCount); for(let i=0; i<n; i++) { const c = next.stock.shift(); c.faceUp=true; next.waste.push(c); } break;
+                case 'RECYCLE': next.stock = next.waste.reverse().map(c => ({...c, faceUp: false})); next.waste = []; next.recycleCount++; break;
+            }
+            next.moves++;
+            next.movesSinceProgress = progress ? 0 : next.movesSinceProgress + 1;
+            next.history.add(getHash(next));
+            if(Object.values(next.foundations).reduce((a,b)=>a+b.length,0) === 52) next.status = 'won';
+            return next;
+        };
+
+        const evaluate = (state, move, stratName) => {
+            const w = STRATEGIES[stratName].weights;
+            let score = 0;
+            let maxHidden = 0, deepCol = -1;
+            state.tableau.forEach((c, i) => { const h = c.filter(x => !x.faceUp).length; if(h > maxHidden) { maxHidden = h; deepCol = i; } });
+            const demandedRanks = [];
+            state.tableau.forEach(col => { if(col.length > 0) { const top = col[col.length-1]; if (top.value > 1) demandedRanks.push({ val: top.value - 1, color: top.color === 'red' ? 'black' : 'red' }); }});
+
+            switch(move.type) {
+                case 'W2F': score += w.foundation; if(!isSafe(move.card, state.foundations, state.tableau, STRATEGIES[stratName])) score -= 200; break;
+                case 'T2F': score += w.foundation; if(move.reveals) { score += w.reveal; if(move.from === deepCol) score += w.deep; } if(!isSafe(move.card, state.foundations, state.tableau, STRATEGIES[stratName])) score -= 200; break;
+                case 'T2T': score += w.tableau; if(move.reveals) { score += w.reveal; if(move.from === deepCol) score += w.deep; } if(move.isKing) score += w.kingToEmpty; else if(move.idx > 0 && !move.reveals) score += (w.sequenceBreak || -150); if(demandedRanks.some(d => d.val === move.card.value && d.color === move.card.color)) score += w.demand; score += w.chain; break;
+                case 'W2T': score += w.waste; if(move.isKing) score += w.kingToEmpty / 2; if(demandedRanks.some(d => d.val === move.card.value && d.color === move.card.color)) score += w.demand; break;
+                case 'F2T': score -= 20; if(demandedRanks.some(d => d.val === move.card.value && d.color === move.card.color)) score += w.demand; break;
+                case 'RECYCLE': score += w.recycle; break;
+                case 'DRAW': score += w.stock; break;
+            }
+            return score;
+        };
+
+        const solveSingle = (deck, drawCount, strategy) => {
+            let state = createGame(deck, drawCount);
+            state.activeStrategy = strategy;
+            state.history.add(getHash(state));
+            let loops = 0;
+            while(state.status === 'playing' && loops < 2500) {
+                const moves = getMoves(state);
+                if(moves.length === 0) { state.status = 'stuck'; break; }
+                const rated = moves.map(m => ({ m, score: evaluate(state, m, strategy) }));
+                rated.sort((a,b) => b.score - a.score);
+                let bestMove = null;
+                for(let r of rated) { const sim = apply(state, r.m); if(!state.history.has(getHash(sim))) { bestMove = r.m; break; } }
+                if(!bestMove) { bestMove = moves[Math.floor(Math.random() * moves.length)]; if(state.history.has(getHash(apply(state,bestMove)))) { state.status='stuck'; break; } }
+                state = apply(state, bestMove);
+                loops++;
+                if(state.moves > 2500) state.status = 'defeat';
+            }
+            return state;
+        };
+
+        // --- UPDATED PORTFOLIO (FINDS BEST) ---
+        const solvePortfolio = (deck, drawCount) => {
+            let bestWin = null;
+            for(const strat of ORDERED_STRATS) {
+                const result = solveSingle(deck, drawCount, strat);
+                if(result.status === 'won') {
+                    if (!bestWin || result.moves < bestWin.result.moves) {
+                        bestWin = { result, strat };
+                    }
+                }
+            }
+            return bestWin || { result: { status: 'failed', moves: 0 }, strat: 'NONE' };
+        };
+
+        // --- VERDICT ---
+        const getVerdict = (r) => {
+            if(r.status !== 'won') return { label: "FAIL", desc: "Unsolvable?", color: "text-red-500", icon: Icons.X, type: "fail" };
+            const { moves, recycleCount: recycles, foundationPulls: pulls } = r;
+
+            if(moves < 115 && recycles <= 1 && pulls <= 1) 
+                return { label: "EASY", desc: "Straightforward", color: "text-emerald-400", icon: Icons.Smile, type: "easy" };
+            if(pulls > 4) 
+                return { label: "BRAIN TEASER", desc: "Complex backtracking", color: "text-purple-400", icon: Icons.Brain, type: "tricky" };
+            if(pulls > 0) 
+                return { label: "TRICKY", desc: "Non-linear moves", color: "text-blue-400", icon: Icons.Brain, type: "tricky" };
+            if(recycles > 5) 
+                return { label: "GRIND", desc: "Heavy recycling", color: "text-amber-500", icon: Icons.Refresh, type: "hard" };
+            if(moves > 150) 
+                return { label: "MARATHON", desc: "Long & steady", color: "text-orange-400", icon: Icons.Zap, type: "hard" };
+            
+            return { label: "STANDARD", desc: "Balanced", color: "text-slate-200", icon: Icons.Check, type: "std" };
+        };
+
+        // --- LEGEND ---
+        const Legend = () => (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4 text-xs text-slate-400">
+                <div className="flex items-center gap-2"><Icon path={Icons.Smile} className="text-emerald-400"/> Easy (&lt; 115 moves)</div>
+                <div className="flex items-center gap-2"><Icon path={Icons.Check} className="text-slate-300"/> Standard</div>
+                <div className="flex items-center gap-2"><Icon path={Icons.Brain} className="text-purple-400"/> Brain Teaser (&gt; 4 pulls)</div>
+                <div className="flex items-center gap-2"><Icon path={Icons.Refresh} className="text-amber-500"/> Grind (&gt; 5 recycles)</div>
+                <div className="flex items-center gap-2"><Icon path={Icons.Zap} className="text-orange-400"/> Marathon (&gt; 150 moves)</div>
+            </div>
+        );
+
+        // --- REACT APP ---
+        const App = () => {
+            const [deckInput, setDeckInput] = useState("QH,5D,3C,XH,QC,9D,6D,7S,8H,JD,7C,AC,6S,JH,4D,3S,9S,JS,KS,AD,6C,2D,AS,5S,9H,KC,5C,JC,QD,4S,8C,8D,AH,9C,6H,KD,2S,7D,8S,XC,2H,3D,5H,4C,2C,QS,3H,XD,4H,KH,XS,7H");
+            const [activeTab, setActiveTab] = useState('batch');
+            const [games, setGames] = useState([]);
+            const [filterType, setFilterType] = useState('All');
+            const [drawMode, setDrawMode] = useState('3');
+            const [batchConfig, setBatchConfig] = useState({ start:0, count:200 });
+            const [results, setResults] = useState(null);
+            const [analyzing, setAnalyzing] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [gameTypes, setGameTypes] = useState([]);
+            const [singleResult, setSingleResult] = useState(null);
+
+            const handleUpload = (e) => {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const json = JSON.parse(evt.target.result);
+                        setGames(json.games || []);
+                        const types = new Set();
+                        (json.games||[]).forEach(g => { if(g.Type) g.Type.split(',').forEach(t => types.add(t.trim())); });
+                        setGameTypes(Array.from(types).sort());
+                    } catch(err) { alert("Invalid JSON"); }
+                };
+                reader.readAsText(e.target.files[0]);
+            };
+
+            const runBatch = async () => {
+                setAnalyzing(true);
+                setResults(null);
+                let targets = games;
+                if(filterType !== 'All') targets = targets.filter(g => g.Type && g.Type.includes(filterType));
+                const start = Math.min(targets.length, parseInt(batchConfig.start));
+                const count = parseInt(batchConfig.count);
+                const slice = targets.slice(start, start + count);
+                const res = [];
+
+                for(let i=0; i<slice.length; i++) {
+                    const g = slice[i];
+                    const dm = drawMode === 'auto' ? (g.TypeDescription?.includes('3-Card') ? 3 : 1) : parseInt(drawMode);
+                    if(i%5===0) await new Promise(r => setTimeout(r,0)); 
+                    const { result, strat } = solvePortfolio(g.DecodedDeck, dm);
+                    const v = getVerdict(result);
+                    res.push({ id: g.GameId, status: result.status, moves: result.moves, strat, verdict: v, recycles: result.recycleCount, pulls: result.foundationPulls });
+                    setProgress(Math.round(((i+1)/slice.length)*100));
+                }
+                setResults(res);
+                setAnalyzing(false);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 flex items-center gap-2">
+                                <Icon path={Icons.Zap} className="text-emerald-400"/> Solitaire Omega v7
+                            </h1>
+                            <div className="flex gap-2 bg-slate-800 p-1 rounded-lg">
+                                <button onClick={()=>setActiveTab('board')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${activeTab==='board' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Board</button>
+                                <button onClick={()=>setActiveTab('batch')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${activeTab==='batch' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Analytics</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="flex-grow bg-slate-950 p-6 overflow-auto">
+                        <div className="max-w-7xl mx-auto">
+                            {activeTab === 'batch' && (
+                                <div className="space-y-8 animate-in fade-in zoom-in duration-300">
+                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+                                        <div className="flex flex-wrap gap-4 items-end">
+                                            <label className="flex-1 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-lg transition border border-slate-700 hover:border-emerald-500/50 px-4 flex items-center gap-2">
+                                                <Icon path={Icons.Upload} /> {games.length ? `${games.length} Games` : 'Upload JSON'}
+                                                <input type="file" accept=".json" className="hidden" onChange={handleUpload} />
+                                            </label>
+                                            <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 text-sm text-slate-300 focus:border-emerald-500 outline-none"><option value="All">All Types</option>{gameTypes.map(t=><option key={t} value={t}>{t}</option>)}</select>
+                                            <select value={drawMode} onChange={e=>setDrawMode(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 text-sm text-slate-300 focus:border-emerald-500 outline-none"><option value="auto">Auto</option><option value="1">Draw 1</option><option value="3">Draw 3</option></select>
+                                            <input type="number" value={batchConfig.start} onChange={e=>setBatchConfig({...batchConfig,start:e.target.value})} className="w-20 bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-2 text-center text-sm text-white focus:border-emerald-500 outline-none" placeholder="Start" />
+                                            <input type="number" value={batchConfig.count} onChange={e=>setBatchConfig({...batchConfig,count:e.target.value})} className="w-20 bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-2 text-center text-sm text-white focus:border-emerald-500 outline-none" placeholder="Count" />
+                                            <button onClick={runBatch} disabled={analyzing || !games.length} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition shadow-lg flex items-center gap-2 ${analyzing ? 'bg-slate-800 text-slate-500' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+                                                {analyzing ? <Icon path={Icons.Refresh} className="animate-spin"/> : <Icon path={Icons.Zap}/>} {analyzing ? `${progress}%` : 'Run'}
+                                            </button>
+                                        </div>
+                                        {analyzing && <div className="mt-4 h-1 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all duration-300" style={{width:`${progress}%`}}></div></div>}
+                                    </div>
+
+                                    {results && (
+                                        <div className="space-y-6">
+                                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                                                <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+                                                    <Legend />
+                                                </div>
+                                                <div className="max-h-96 overflow-y-auto custom-scroll">
+                                                    <table className="w-full text-sm text-left text-slate-400">
+                                                        <thead className="bg-slate-800 text-slate-500 uppercase text-xs sticky top-0 font-bold">
+                                                            <tr>
+                                                                <th className="px-6 py-4">Game ID</th>
+                                                                <th className="px-6 py-4">Result</th>
+                                                                <th className="px-6 py-4">Moves</th>
+                                                                <th className="px-6 py-4">Strategy</th>
+                                                                <th className="px-6 py-4">Analysis (Icon & Verdict)</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-800">
+                                                            {results.map((r,i)=>(
+                                                                <tr key={i} className="hover:bg-slate-800/50 transition">
+                                                                    <td className="px-6 py-3 font-mono text-emerald-500">{r.id}</td>
+                                                                    <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${r.status==='won'?'bg-emerald-500/10 text-emerald-400':'bg-red-500/10 text-red-400'}`}>{r.status}</span></td>
+                                                                    <td className="px-6 py-3 font-mono text-white">{r.moves}</td>
+                                                                    <td className="px-6 py-3 text-xs text-slate-300">{r.strat}</td>
+                                                                    <td className="px-6 py-3">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className={`p-2 rounded-full bg-slate-800 ${r.verdict.color} border border-slate-700`}>
+                                                                                <Icon path={r.verdict.icon} size={18} />
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className={`text-xs font-bold ${r.verdict.color}`}>{r.verdict.label}</div>
+                                                                                <div className="text-[10px] text-slate-400">{r.verdict.desc}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'board' && (
+                                <div className="flex flex-col items-center justify-center py-20 text-slate-500 space-y-4">
+                                    {singleResult ? (
+                                        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center max-w-md animate-pop shadow-2xl">
+                                            <div className="mb-4 text-5xl">{singleResult.status === 'won' ? '🎉' : '💀'}</div>
+                                            <h3 className={`text-3xl font-black mb-2 ${singleResult.status==='won'?'text-emerald-400':'text-red-500'}`}>{singleResult.status.toUpperCase()}</h3>
+                                            
+                                            <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 mb-6">
+                                                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Game DNA</div>
+                                                <div className="flex items-center justify-center gap-3 mb-2">
+                                                    <Icon path={singleResult.verdict.icon} className={`w-8 h-8 ${singleResult.verdict.color}`} />
+                                                    <span className={`text-2xl font-bold ${singleResult.verdict.color}`}>{singleResult.verdict.label}</span>
+                                                </div>
+                                                <div className="text-sm text-slate-400">{singleResult.verdict.desc}</div>
+                                            </div>
+
+                                            <button onClick={()=>setSingleResult(null)} className="text-slate-400 hover:text-white text-sm underline">Try another deck</button>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center max-w-md">
+                                            <Icon path={Icons.Brain} size={48} className="mx-auto mb-4 text-purple-500"/>
+                                            <h3 className="text-xl font-bold text-white mb-2">Single Game Analysis</h3>
+                                            <textarea value={deckInput} onChange={e=>setDeckInput(e.target.value)} className="w-full h-24 bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-400 focus:border-emerald-500 outline-none resize-none mb-4" />
+                                            <button onClick={()=>{
+                                                const { result, strat } = solvePortfolio(deckInput, 1); 
+                                                const v = getVerdict(result);
+                                                setSingleResult({ ...result, strat, verdict: v });
+                                            }} className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-500 transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2">
+                                                <Icon path={Icons.Zap} /> Analyze & Solve
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
