@@ -3,6 +3,9 @@
 ![Version](https://img.shields.io/badge/version-Omega_v7-emerald)
 ![Tech](https://img.shields.io/badge/stack-React_|_Tailwind-blue)
 ![License](https://img.shields.io/badge/license-MIT-grey)
+[![Live Demo](https://img.shields.io/badge/demo-Live_App-red)](https://yevheniisiechko.github.io/solitaire-solver-omega/)
+
+### 🔴 [**Play Live Here**](https://yevheniisiechko.github.io/solitaire-solver-omega/)
 
 **Solitaire Solver Omega** is a powerful Single File Application (SFA) designed to solve and deeply analyze Klondike Solitaire game states.
 
@@ -18,13 +21,18 @@ The project utilizes a **Portfolio Solving** approach: instead of relying on a s
 
 ## 🚀 How to Run
 
-1.  Download the `index.html` file (or clone this repository).
+### Option 1: Live Version
+Simply visit the hosted version: [**Solitaire Solver Omega**](https://yevheniisiechko.github.io/solitaire-solver-omega/)
+
+### Option 2: Local Version
+1.  Download the `index.html` file from this repository.
 2.  Open it in any modern web browser (Chrome, Firefox, Edge).
 3.  Enjoy!
 
-### Modes:
+## 🎮 Modes
+
 * **Board Mode:** Paste a Deck String and click "Analyze & Solve" to watch the bot solve a specific game visually.
-* **Analytics Mode:** Upload a `.json` file with a database of levels for mass testing.
+* **Analytics Mode:** Upload a `.json` file with a database of levels for mass testing and statistical analysis.
 
 ## 🤖 Strategies (AI Agents)
 
