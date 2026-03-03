@@ -123,13 +123,32 @@ export const getVerdict = (r) => {
 
 // --- NEW: Solve with full move history for simulation ---
 export const solveWithHistory = (deck, drawCount = 1) => {
-  // First find the best strategy via portfolio
-  const portfolio = solvePortfolio(deck, drawCount);
-  if (portfolio.result.status !== 'won') {
-    return { moves: [], states: [], strategy: 'NONE', status: 'failed', finalState: portfolio.result };
+  // Run all strategies and collect per-strategy results
+  const strategyResults = [];
+  let bestWin = null;
+  for (const strat of ORDERED_STRATS) {
+    const result = solveSingle(deck, drawCount, strat);
+    const info = STRATEGIES[strat];
+    strategyResults.push({
+      key: strat,
+      name: info?.name || strat,
+      status: result.status,
+      moves: result.moves,
+      recycleCount: result.recycleCount || 0,
+      foundationPulls: result.foundationPulls || 0,
+      foundationTotal: result.status === 'won' ? 52 : Object.values(result.foundations).reduce((a, b) => a + b.length, 0),
+      safety: info?.safety || 'None'
+    });
+    if (result.status === 'won' && (!bestWin || result.moves < bestWin.result.moves)) {
+      bestWin = { result, strat };
+    }
   }
 
-  const strategy = portfolio.strat;
+  if (!bestWin) {
+    return { moves: [], states: [], strategy: 'NONE', status: 'failed', finalState: { status: 'failed' }, strategyResults };
+  }
+
+  const strategy = bestWin.strat;
 
   // Re-solve with that strategy, recording every move and state
   let state = createGame(deck, drawCount);
@@ -188,7 +207,8 @@ export const solveWithHistory = (deck, drawCount = 1) => {
     strategy,
     strategyName: STRATEGIES[strategy]?.name || strategy,
     status: state.status,
-    finalState: state
+    finalState: state,
+    strategyResults
   };
 };
 

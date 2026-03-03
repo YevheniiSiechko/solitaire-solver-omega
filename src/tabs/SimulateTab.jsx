@@ -80,6 +80,85 @@ const TableauColumn = ({ col, colIdx, activeCardId, lastMove }) => {
   );
 };
 
+// Strategy performance scoreboard
+const StrategyPanel = ({ results, bestKey }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!results || results.length === 0) return null;
+
+  const sorted = [...results].sort((a, b) => {
+    if (a.status === 'won' && b.status !== 'won') return -1;
+    if (a.status !== 'won' && b.status === 'won') return 1;
+    if (a.status === 'won' && b.status === 'won') return a.moves - b.moves;
+    return b.foundationTotal - a.foundationTotal;
+  });
+
+  const wins = results.filter(r => r.status === 'won').length;
+  const shown = expanded ? sorted : sorted.slice(0, 5);
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between mb-3 group"
+      >
+        <div className="flex items-center gap-2">
+          <Icon path={Icons.Brain} size={14} className="text-purple-400" />
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Strategy Performance</h3>
+          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">
+            {wins}/{results.length} won
+          </span>
+        </div>
+        <span className="text-slate-500 text-xs group-hover:text-white transition">
+          {expanded ? 'Show less' : 'Show all'}
+        </span>
+      </button>
+
+      <div className="space-y-1">
+        {shown.map((r, i) => {
+          const isBest = r.key === bestKey;
+          const won = r.status === 'won';
+          const barWidth = won ? 100 : Math.round((r.foundationTotal / 52) * 100);
+          return (
+            <div key={r.key} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs transition
+              ${isBest ? 'bg-cyan-500/10 border border-cyan-500/20' : 'hover:bg-slate-800/50'}`}>
+              <span className={`w-5 text-right font-mono font-bold ${won ? 'text-emerald-400' : 'text-slate-600'}`}>
+                {i + 1}
+              </span>
+              <span className={`w-40 truncate font-medium ${isBest ? 'text-cyan-300' : won ? 'text-white' : 'text-slate-500'}`}>
+                {r.name}
+                {isBest && <span className="ml-1 text-[9px] text-cyan-400 font-bold">BEST</span>}
+              </span>
+              <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${won
+                    ? isBest ? 'bg-gradient-to-r from-cyan-500 to-emerald-400' : 'bg-emerald-500/70'
+                    : 'bg-slate-600/50'}`}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+              <span className={`w-16 text-right font-mono ${won ? 'text-emerald-400' : 'text-slate-600'}`}>
+                {won ? `${r.moves} moves` : `${r.foundationTotal}/52`}
+              </span>
+              <span className={`w-5 text-center ${won ? 'text-emerald-400' : 'text-red-400/60'}`}>
+                {won ? '\u2713' : '\u2717'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {!expanded && sorted.length > 5 && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="w-full mt-2 text-[10px] text-slate-500 hover:text-slate-300 transition text-center"
+        >
+          + {sorted.length - 5} more strategies
+        </button>
+      )}
+    </div>
+  );
+};
+
 export const SimulateTab = () => {
   const [deckInput, setDeckInput] = useState(DEFAULT_DECK);
   const [solution, setSolution] = useState(null); // { moves, states, strategy, ... }
@@ -146,6 +225,7 @@ export const SimulateTab = () => {
       const result = solveWithHistory(deckInput, 1);
       if (result.status === 'failed' || result.status === 'stuck') {
         setError('This deck is unsolvable. No strategy could find a winning solution.');
+        if (result.strategyResults) setSolution(result);
         setSolving(false);
         return;
       }
@@ -230,6 +310,17 @@ export const SimulateTab = () => {
               <Icon path={Icons.Info} size={16} /> {error}
             </div>
           )}
+          {error && solution?.strategyResults && (
+            <div className="mt-4">
+              <StrategyPanel results={solution.strategyResults} bestKey={null} />
+              <button
+                onClick={() => { setSolution(null); setError(null); }}
+                className="mt-3 text-xs text-slate-500 hover:text-white transition underline"
+              >
+                Try another deck
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -251,6 +342,9 @@ export const SimulateTab = () => {
               <Icon path={Icons.SkipBack} size={14} /> New Deck
             </button>
           </div>
+
+          {/* Strategy Performance */}
+          <StrategyPanel results={solution.strategyResults} bestKey={solution.strategy} />
 
           {/* Board */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">

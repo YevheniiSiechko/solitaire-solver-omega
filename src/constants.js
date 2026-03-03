@@ -40,7 +40,10 @@ export const STRATEGIES = {
   REVERSE: { name: "Reverse Logic", weights: { foundation: 500, reveal: 100, tableau: 100, stock: 100, recycle: -50, waste: 100, kingToEmpty: 50, chain: 50, demand: 50, deep: 50 }, safety: "None" },
   ORACLE: { name: "Oracle (Lookahead)", weights: { foundation: 100, reveal: 500, tableau: 50, stock: 10, recycle: -400, waste: 30, kingToEmpty: 400, chain: 300, demand: 400, deep: 300, lookahead: 150 }, safety: "Smart" },
   LIBERATOR: { name: "Liberator", weights: { foundation: 80, reveal: 700, tableau: 30, stock: 15, recycle: -300, waste: 30, kingToEmpty: 600, chain: 400, demand: 400, deep: 500, emptyCol: 1500 }, safety: "Normal" },
-  ENDGAME: { name: "Endgame Master", weights: { foundation: 150, reveal: 500, tableau: 80, stock: 10, recycle: -300, waste: 30, kingToEmpty: 300, chain: 300, demand: 300, deep: 300, phase: 500 }, safety: "Smart" }
+  ENDGAME: { name: "Endgame Master", weights: { foundation: 150, reveal: 500, tableau: 80, stock: 10, recycle: -300, waste: 30, kingToEmpty: 300, chain: 300, demand: 300, deep: 300, phase: 500 }, safety: "Smart" },
+  PROPHET: { name: "Prophet (Deep Sight)", weights: { foundation: 90, reveal: 900, tableau: 60, stock: 10, recycle: -500, waste: 25, kingToEmpty: 500, chain: 600, demand: 500, deep: 2000, lookahead: 250 }, safety: "Smart" },
+  PHOENIX: { name: "Phoenix (Adaptive)", weights: { foundation: 100, reveal: 600, tableau: 120, stock: 15, recycle: -400, waste: 35, kingToEmpty: 500, chain: 500, demand: 400, deep: 400, emptyCol: 1200, phase: 800 }, safety: "Normal" },
+  SENTINEL: { name: "Sentinel (Safe Chain)", weights: { foundation: 60, reveal: 800, tableau: 80, stock: 5, recycle: -600, waste: 20, kingToEmpty: 700, chain: 1500, demand: 1200, deep: 800, emptyCol: 600 }, safety: "Strict" }
 };
 
 export const ORDERED_STRATS = ['UNBLOCKER', ...Object.keys(STRATEGIES).filter(k => k !== 'UNBLOCKER')];
